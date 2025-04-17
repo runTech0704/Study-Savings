@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+      - backend_data:/app/study_project/
+    ports:
+      - "8000:8000"
+    command: >
+      bash -c "cd study_project &&
+               chmod +x wait-for-it.sh &&
+               python manage.py makemigrations study_tracker &&
+               python manage.py migrate &&
+               python manage.py runserver 0.0.0.0:8000"
+    environment:
+      - DEBUG=1
+      - SECRET_KEY=django-insecure-a5h&8xz$#0i&*lc@-_85(49f(uyk8+!m^@7r!6@9o+-sl8zv)7
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - WDS_SOCKET_PORT=0
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  backend_data:
