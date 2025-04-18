@@ -1,6 +1,7 @@
 # StudySavings - 勉強時間記録・仮想貯金アプリ
 
-StudySavingsは勉強時間を記録し、その時間を時給換算で仮想的に貯金するWebアプリケーションです。目標を設定し、勉強によって貯めたお金で達成を目指します。
+[StudySavings](https://study-savings-frontend-456434511485.asia-northeast1.run.app/) は勉強時間を記録し、その時間を時給換算で仮想的に貯金するWebアプリケーションです。目標を設定し、勉強によって貯めたお金で達成を目指します。
+
 
 ## 機能
 
@@ -38,120 +39,6 @@ StudySavingsは勉強時間を記録し、その時間を時給換算で仮想�
 - Google Vertex AI
 - Supabase (PostgreSQL)
 - Docker / Docker Compose
-
-## ローカル開発環境のセットアップ
-
-### Docker Composeを使用する方法（推奨）
-
-1. Dockerとdocker-composeをインストールしてください
-   - [Docker Desktop](https://www.docker.com/products/docker-desktop/)のインストール
-
-2. プロジェクトをクローンまたはダウンロードして、プロジェクトディレクトリに移動
-   ```bash
-   git clone <リポジトリURL>
-   cd study_savings_app
-   ```
-
-3. Docker Composeでアプリケーションを起動
-   ```bash
-   docker-compose up -d
-   ```
-
-4. ブラウザで以下のURLにアクセス:
-   - フロントエンド: http://localhost:3000
-   - バックエンドAPI: http://localhost:8000/api
-   - 管理サイト: http://localhost:8000/admin (ユーザー名: admin, パスワード: adminpassword)
-
-5. アプリケーションの停止
-   ```bash
-   docker-compose down
-   ```
-
-## AI学習分析のセットアップ
-
-学習分析機能を有効にするには、追加で以下の設定が必要です：
-
-1. Google Cloud Platformアカウントを取得し、プロジェクトを作成
-2. Vertex AI APIを有効化
-3. サービスアカウント認証情報を設定
-4. バックエンドの`.env`ファイルに以下を追加：
-   ```
-   GCP_PROJECT_ID=your-gcp-project-id
-   GCP_REGION=us-central1
-   ```
-
-詳細な手順は [AI_ANALYSIS_SETUP.md](./AI_ANALYSIS_SETUP.md) を参照してください。
-
-## 本番環境へのデプロイ
-
-このアプリケーションはGoogle Cloud RunとSupabaseを使用してデプロイできます。
-
-### 前提条件
-
-- Google Cloud Platform (GCP)アカウント
-- Supabaseアカウント
-- Google Cloud SDK (`gcloud` コマンド)
-- Docker
-
-### 1. Supabaseのセットアップ
-
-1. [Supabase](https://supabase.com/)でプロジェクトを作成
-2. 作成されたデータベースの接続情報を取得
-3. データベースマイグレーションを実行:
-   ```bash
-   cd backend
-   # .env ファイルを作成して接続情報を設定
-   cp .env.example .env
-   # 環境変数を編集
-   vi .env
-   # マイグレーションスクリプトを実行
-   chmod +x migrate.sh
-   ./migrate.sh
-   ```
-
-### 2. Google Cloud Platformのセットアップ
-
-1. GCPプロジェクトを作成
-2. 必要なAPIを有効化
-   ```bash
-   chmod +x setup-gcp.sh
-   ./setup-gcp.sh <プロジェクトID> <リージョン>
-   ```
-
-### 3. 環境変数の設定
-
-以下の環境変数をCloud Runサービスに設定します:
-
-- `DATABASE_URL`: Supabaseデータベース接続URL
-- `SECRET_KEY`: Djangoシークレットキー
-- `DEBUG`: 通常は 'False'
-- `ALLOWED_HOSTS`: デプロイ先のドメイン
-- `CORS_ALLOWED_ORIGINS`: フロントエンドのURL
-- `CSRF_TRUSTED_ORIGINS`: フロントエンドのURL
-- `GCP_PROJECT_ID`: Google Cloud ProjectのID
-- `GCP_REGION`: Vertex AIのリージョン
-
-### 4. デプロイ
-
-#### 手動デプロイ（推奨）
-
-```bash
-chmod +x deploy.sh
-./deploy.sh <プロジェクトID> <リージョン>
-```
-
-#### Cloud Buildを使用したデプロイ（CI/CD）
-
-1. GitHub/GitLabリポジトリを設定
-2. Cloud Buildトリガーを作成:
-   - ソース: リポジトリ
-   - ビルド設定: `cloudbuild.yaml`
-
-### 5. デプロイ後の確認
-
-1. マイグレーションの実行
-2. 管理者ユーザーの作成
-3. サービスが正常に起動しているか確認
 
 ## アプリケーション構成
 
@@ -193,7 +80,3 @@ study_savings_app/
 ## ライセンス
 
 MIT
-
-## 作者
-
-このアプリケーションはCloud AIによって作成されました。
