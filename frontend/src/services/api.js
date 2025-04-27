@@ -20,83 +20,21 @@ const removeJwtTokens = () => {
   localStorage.removeItem('refresh_token');
 };
 
-// CSRFトークンを取得する関数
-const getCookie = (name) => {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      // Does this cookie string begin with the name we want?
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-};
-
-// CSRFトークン取得の最大再試行回数
-const MAX_CSRF_RETRIES = 3;
-let csrfRetryCount = 0;
-
 // Axiosインスタンスの設定
 const axiosInstance = axios.create({
   baseURL: baseURL,
-  withCredentials: true,  // クロスオリジンリクエストにクッキーを含める
   headers: {
     'Content-Type': 'application/json',
   }
 });
 
-// リクエストインターセプター
+// リクエストインターセプター - リクエスト送信前に実行
 axiosInstance.interceptors.request.use(
   async config => {
     // JWTトークンがあれば、ヘッダーに追加
     const token = getJwtToken();
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    // CSRFトークンの処理も維持（両方の認証方法をサポート）
-    if (config.method === 'post' || config.method === 'put' || config.method === 'delete' || config.method === 'patch') {
-      let csrfToken = getCookie('csrftoken');
-      
-      // CSRFトークンがない場合、取得する
-      if (!csrfToken && config.url !== '/auth/csrf/' && !token) {
-        try {
-          console.log('CSRFトークンが見つからないため、自動的に取得します');
-          // 配列循環を回避するために直接 axios を使用
-          const response = await axios.get(`${baseURL}/auth/csrf/`, { 
-            withCredentials: true,
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            } 
-          });
-          // ヘッダーから取得を試行
-          csrfToken = response.headers['x-csrftoken'];
-          
-          // ヘッダから取得できない場合は再度Cookieをチェック
-          if (!csrfToken) {
-            // 少し待ってからCookieをチェック
-            await new Promise(resolve => setTimeout(resolve, 100));
-            csrfToken = getCookie('csrftoken');
-          } else {
-            // マニュアルでCookieを設定 - SameSite=Noneを使用(クロスドメイン対応)
-            console.log('インターセプターでCSRFトークン設定:', csrfToken);
-            document.cookie = `csrftoken=${csrfToken}; path=/; SameSite=None; Secure;`;
-          }
-        } catch (error) {
-          console.error('CSRFトークン取得に失敗しました:', error);
-        }
-      }
-      
-      if (csrfToken && !token) {
-        // バックエンドが受け付けるヘッダー名のみを使用
-        config.headers['X-CSRFToken'] = csrfToken;
-      }
     }
     return config;
   },
@@ -105,7 +43,7 @@ axiosInstance.interceptors.request.use(
   }
 );
 
-// レスポンスインターセプター
+// レスポンスインターセプター - レスポンス受信時に実行
 axiosInstance.interceptors.response.use(
   response => response,
   async error => {
@@ -139,12 +77,14 @@ axiosInstance.interceptors.response.use(
         }
       } else {
         // リフレッシュトークンがない場合
-        console.warn('リフレッシュトークンが見つかりません');
+        window.location.href = '/login';
       }
     }
     
-    // エラーをコンソールに表示（デバッグ用）
-    console.error('API Error:', error.response ? error.response.data : error.message);
+    // エラーをコンソールに表示
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('API Error:', error.response ? error.response.data : error.message);
+    }
     return Promise.reject(error);
   }
 );
@@ -152,55 +92,22 @@ axiosInstance.interceptors.response.use(
 const API = {
   // 認証関連
   auth: {
-    // CSRFトークンを取得するメソッド（従来の認証用）
-    getCSRFToken: async () => {
+    // ユーザー登録
+    register: async (userData) => {
       try {
-        csrfRetryCount = 0;
-        console.log('エンドポイントを呼び出してCSRFトークンを取得しています...');
-        
-        // モバイルブラウザでも動作するようにオプションを調整
-        const response = await axios.get(`${baseURL}/auth/csrf/`, {
-          withCredentials: true,
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          }
-        });
-        
-        // レスポンスヘッダーからCSRFトークンを取得
-        const csrfToken = response.headers['x-csrftoken'];
-        if (csrfToken) {
-          console.log('X-CSRFTokenヘッダーからトークンを取得しました:', csrfToken);
-          // SameSite=Noneを使用してクロスドメインでも動作するようにする
-          document.cookie = `csrftoken=${csrfToken}; path=/; SameSite=None; Secure;`;
-        } else {
-          console.log('CookieからCSRFトークンを取得しています...');
-          // Cookieから取得を試行
-          const cookieToken = getCookie('csrftoken');
-          if (cookieToken) {
-            console.log('Cookieからトークンを取得しました:', cookieToken);
-          } else {
-            console.warn('レスポンスからCSRFトークンを取得できませんでした');
-          }
-        }
-        
-        return response;
+        console.log('新規ユーザー登録リクエスト');
+        return await axios.post(`${baseURL}/auth/register/`, userData);
       } catch (error) {
-        console.error('CSRFトークン取得エラー:', error);
-        if (csrfRetryCount < MAX_CSRF_RETRIES) {
-          csrfRetryCount++;
-          console.log(`CSRFトークン取得再試行 (${csrfRetryCount}/${MAX_CSRF_RETRIES})`);
-          return API.auth.getCSRFToken();
-        }
+        console.error('ユーザー登録エラー:', error);
         throw error;
       }
     },
     
-    // JWT認証用の新しいメソッド
-    loginJWT: async (credentials) => {
+    // ログイン処理
+    login: async (credentials) => {
       try {
-        console.log('JWTログインを試みます:', credentials.username);
-        const response = await axios.post(`${baseURL}/auth/login-jwt/`, credentials);
+        console.log('ログインリクエスト送信:', credentials.username);
+        const response = await axios.post(`${baseURL}/auth/login/`, credentials);
         
         // トークンを保存
         if (response.data.access && response.data.refresh) {
@@ -210,23 +117,35 @@ const API = {
         
         return response;
       } catch (error) {
-        console.error('JWTログインエラー:', error);
+        console.error('ログインエラー:', error);
         throw error;
       }
     },
     
-    // JWTログアウト処理
-    logoutJWT: () => {
-      removeJwtTokens();
-      console.log('JWTトークンを削除しました');
-      return Promise.resolve({ data: { message: 'ログアウトしました。' } });
+    // ログアウト処理
+    logout: async () => {
+      try {
+        // JWTの場合、サーバー側でのログアウト処理は必要最小限
+        const response = await axiosInstance.post('/auth/logout/');
+        
+        // クライアント側でトークンを削除
+        removeJwtTokens();
+        console.log('JWTトークンを削除しました');
+        
+        return response;
+      } catch (error) {
+        // エラーが発生しても、クライアント側のトークンは削除する
+        removeJwtTokens();
+        console.log('ログアウト処理中にエラーが発生しましたが、トークンは削除されました');
+        return { data: { message: 'ログアウトしました。' } };
+      }
     },
     
     // JWTトークンのリフレッシュ
     refreshToken: async () => {
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) {
-        return Promise.reject('No refresh token available');
+        return Promise.reject('リフレッシュトークンがありません');
       }
       
       try {
@@ -250,7 +169,7 @@ const API = {
     verifyToken: async () => {
       const token = localStorage.getItem('access_token');
       if (!token) {
-        return Promise.reject('No token available');
+        return Promise.reject('トークンがありません');
       }
       
       try {
@@ -265,14 +184,15 @@ const API = {
     
     // 認証状態をチェックするメソッド
     checkAuth: async () => {
-      // JWT認証があれば、それを使用
+      // JWT認証があるかチェック
       const token = getJwtToken();
       if (token) {
         try {
           // JWTで認証されているかどうかチェック
           await API.auth.verifyToken();
           console.log('JWT認証有効');
-          // ユーザー情報取得（必要な場合）
+          
+          // ユーザー情報取得
           const userResponse = await axiosInstance.get('/user/');
           return {
             data: {
@@ -283,6 +203,7 @@ const API = {
           };
         } catch (error) {
           console.error('JWT認証チェックエラー:', error);
+          
           // JWTトークンが無効な場合、リフレッシュを試みる
           try {
             await API.auth.refreshToken();
@@ -293,33 +214,22 @@ const API = {
               }
             };
           } catch (refreshError) {
-            console.error('トークンのリフレッシュにも失敗しました:', refreshError);
+            // リフレッシュに失敗した場合、トークンを削除
+            console.error('トークンのリフレッシュに失敗しました:', refreshError);
             removeJwtTokens();
             return { data: { isAuthenticated: false } };
           }
         }
       }
       
-      // JWTがない場合は当初のセッション認証を使用
-      try {
-        const response = await axiosInstance.get('/auth/check/');
-        return response;
-      } catch (error) {
-        console.error('認証状態チェックエラー:', error);
-        return { data: { isAuthenticated: false } };
-      }
+      // トークンがない場合は未認証
+      return { data: { isAuthenticated: false } };
     },
-    register: async (userData) => {
-      try {
-        // JWTの場合は直接リクエスト
-        console.log('新規ユーザー登録のためのリクエストを送信します');
-        return await axios.post(`${baseURL}/auth/register/`, userData);
-      } catch (error) {
-        console.error('ユーザー登録エラー:', error);
-        throw error;
-      }
-    },
+    
+    // ユーザー情報を取得
     getUser: () => axiosInstance.get('/user/'),
+    
+    // ユーザー情報を更新
     updateUser: (userData) => axiosInstance.put('/user/', userData),
   },
   
@@ -327,68 +237,20 @@ const API = {
   subjects: {
     getAll: () => axiosInstance.get('/subjects/'),
     getById: (id) => axiosInstance.get(`/subjects/${id}/`),
-    create: async (subjectData) => {
-      const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        await API.auth.getCSRFToken();
-      }
-      return axiosInstance.post('/subjects/', subjectData);
-    },
-    update: async (id, subjectData) => {
-      const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        await API.auth.getCSRFToken();
-      }
-      return axiosInstance.put(`/subjects/${id}/`, subjectData);
-    },
-    delete: async (id) => {
-      const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        await API.auth.getCSRFToken();
-      }
-      return axiosInstance.delete(`/subjects/${id}/`);
-    },
+    create: (subjectData) => axiosInstance.post('/subjects/', subjectData),
+    update: (id, subjectData) => axiosInstance.put(`/subjects/${id}/`, subjectData),
+    delete: (id) => axiosInstance.delete(`/subjects/${id}/`),
   },
   
   // 勉強セッション関連
   sessions: {
     getAll: () => axiosInstance.get('/sessions/'),
     getById: (id) => axiosInstance.get(`/sessions/${id}/`),
-    create: async (sessionData) => {
-      const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        await API.auth.getCSRFToken();
-      }
-      return axiosInstance.post('/sessions/', sessionData);
-    },
-    update: async (id, sessionData) => {
-      const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        await API.auth.getCSRFToken();
-      }
-      return axiosInstance.put(`/sessions/${id}/`, sessionData);
-    },
-    delete: async (id) => {
-      const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        await API.auth.getCSRFToken();
-      }
-      return axiosInstance.delete(`/sessions/${id}/`);
-    },
-    start: async (subjectId) => {
-      const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        await API.auth.getCSRFToken();
-      }
-      return axiosInstance.post('/sessions/start/', { subject: subjectId });
-    },
-    stop: async (sessionId) => {
-      const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        await API.auth.getCSRFToken();
-      }
-      return axiosInstance.post(`/sessions/${sessionId}/stop/`);
-    },
+    create: (sessionData) => axiosInstance.post('/sessions/', sessionData),
+    update: (id, sessionData) => axiosInstance.put(`/sessions/${id}/`, sessionData),
+    delete: (id) => axiosInstance.delete(`/sessions/${id}/`),
+    start: (subjectId) => axiosInstance.post('/sessions/start/', { subject: subjectId }),
+    stop: (sessionId) => axiosInstance.post(`/sessions/${sessionId}/stop/`),
     getCurrent: () => axiosInstance.get('/sessions/current/'),
   },
   
@@ -396,27 +258,9 @@ const API = {
   goals: {
     getAll: () => axiosInstance.get('/goals/'),
     getById: (id) => axiosInstance.get(`/goals/${id}/`),
-    create: async (goalData) => {
-      const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        await API.auth.getCSRFToken();
-      }
-      return axiosInstance.post('/goals/', goalData);
-    },
-    update: async (id, goalData) => {
-      const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        await API.auth.getCSRFToken();
-      }
-      return axiosInstance.put(`/goals/${id}/`, goalData);
-    },
-    delete: async (id) => {
-      const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        await API.auth.getCSRFToken();
-      }
-      return axiosInstance.delete(`/goals/${id}/`);
-    },
+    create: (goalData) => axiosInstance.post('/goals/', goalData),
+    update: (id, goalData) => axiosInstance.put(`/goals/${id}/`, goalData),
+    delete: (id) => axiosInstance.delete(`/goals/${id}/`),
   },
   
   // 統計関連
@@ -426,13 +270,7 @@ const API = {
   
   // 学習分析関連
   analysis: {
-    getLearningAnalysis: async (studyPurpose) => {
-      const csrfToken = getCookie('csrftoken');
-      if (!csrfToken) {
-        await API.auth.getCSRFToken();
-      }
-      return axiosInstance.post('/analyze-learning/', { study_purpose: studyPurpose });
-    },
+    getLearningAnalysis: (studyPurpose) => axiosInstance.post('/analyze-learning/', { study_purpose: studyPurpose }),
   },
 };
 

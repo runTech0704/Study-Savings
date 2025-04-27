@@ -3,16 +3,8 @@
 
 # Django設定
 DEBUG: "False"
-SECRET_KEY: "ZIWArkpWBVFlL8uAunUTNT1EUe5db8Yj4bGMpg5aB2OHkzML1O_VL8pFaFh6b11_VTA"
-
-# 許可するホスト名（カンマ区切り）
 ALLOWED_HOSTS: "study-savings-backend-jwe74s2n4a-an.a.run.app,localhost,127.0.0.1"
-
-# Supabase Database設定
-DATABASE_URL: "postgresql://postgres:A7rfK3pMFsePBHGA@db.pmrcuqklqeduwrtquflo.supabase.co:5432/postgres"
-
-# CORS設定
 CORS_ALLOWED_ORIGINS: "https://study-savings-frontend-456434511485.asia-northeast1.run.app,http://localhost:3000,https://study-savings-backend-jwe74s2n4a-an.a.run.app"
-
-# セキュリティ設定
 CSRF_TRUSTED_ORIGINS: "https://study-savings-frontend-456434511485.asia-northeast1.run.app,https://study-savings-backend-jwe74s2n4a-an.a.run.app,http://localhost:3000"
+GCP_PROJECT_ID: "study-savings"
+GCP_REGION: "us-central1"

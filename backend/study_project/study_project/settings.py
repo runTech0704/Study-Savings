@@ -14,7 +14,19 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-a5h&8xz$#0i&*lc@-_85(49f(uyk8+!m^@7r!6@9o+-sl8zv)7')
+SECRET_KEY = os.environ.get('SECRET_KEY')
+
+# SECRET_KEYが環境変数から取得できない場合は、エラーを発生させる
+if not SECRET_KEY:
+    import sys
+    print('ERROR: SECRET_KEY environment variable is not set!')
+    # 開発環境でのみランダムなキーを生成し、警告を表示
+    if os.environ.get('DEBUG', 'False') == 'True':
+        import secrets
+        SECRET_KEY = secrets.token_hex(32)
+        print('WARNING: Using a randomly generated SECRET_KEY. Do not use this in production!')
+    else:
+        sys.exit(1)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
@@ -30,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',  # JWTトークンブラックリスト
     'corsheaders',
     'study_tracker',
     'whitenoise.runserver_nostatic',  # 静的ファイル配信
@@ -41,11 +54,11 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',  # 静的ファイル配信用ミドルウェア
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    # 一時的にCSRFミドルウェアを無効化してテスト
-    # 'django.middleware.csrf.CsrfViewMiddleware', 
+    'django.middleware.csrf.CsrfViewMiddleware', 
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'study_tracker.middleware.RateLimitMiddleware',  # レート制限ミドルウェア
 ]
 
 ROOT_URLCONF = 'study_project.urls'
@@ -156,20 +169,20 @@ CORS_ALLOW_HEADERS = [
 CSRF_COOKIE_SECURE = True  # HTTPSでのみ送信
 SESSION_COOKIE_SECURE = True  # HTTPSでのみ送信
 
-# クロスドメインでも動作するようにSameSite=NoneとSecureを設定
-CSRF_COOKIE_SAMESITE = 'None'
-SESSION_COOKIE_SAMESITE = 'None'
+# セキュリティを強化するためにSameSiteをLaxに設定
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = 'Lax'
 
 # iPhone用に選択的にCookieを送信する設定
 CSRF_COOKIE_DOMAIN = None
 SESSION_COOKIE_DOMAIN = None
 
-# セッション設定の改善
+# セッション設定 - JWT認証では必要ないが、Django管理画面用に残しておく
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_NAME = 'sessionid'
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_AGE = 60 * 60 * 24 * 14  # 2週間
-SESSION_SAVE_EVERY_REQUEST = True  # セッションを毎リクエストで保存
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 1  # 1日に短縮
+SESSION_COOKIE_SECURE = True
 # CSRF設定
 CSRF_COOKIE_HTTPONLY = False  # JavaScriptからアクセスできるようにFalse
 CSRF_COOKIE_NAME = 'csrftoken'
@@ -183,12 +196,10 @@ CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
 # REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # 開発中は許可
+        'rest_framework.permissions.IsAuthenticated',  # 基本的に認証必要
     ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',  # JWT認証
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',  # JWT認証のみサポート
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -199,13 +210,13 @@ REST_FRAMEWORK = {
 # JWT設定
 from datetime import timedelta
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),  # アクセストークンの有効期間
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),  # アクセストークンの有効期間（セキュリティ向上のため短縮）
     'REFRESH_TOKEN_LIFETIME': timedelta(days=14),  # リフレッシュトークンの有効期間
     'ROTATE_REFRESH_TOKENS': True,  # リフレッシュトークンのローテーション
-    'BLACKLIST_AFTER_ROTATION': False,  # ブラックリスト機能は使用しない
+    'BLACKLIST_AFTER_ROTATION': True,  # ブラックリスト機能を有効化
     'UPDATE_LAST_LOGIN': True,  # 最終ログイン時間を更新
     'ALGORITHM': 'HS256',  # 署名アルゴリズム
-    'SIGNING_KEY': SECRET_KEY,  # 署名キー
+    'SIGNING_KEY': os.environ.get('JWT_SECRET_KEY', SECRET_KEY),  # JWT用の個別の署名キーを使用（環境変数から取得）
     'AUTH_HEADER_TYPES': ('Bearer',),  # 認証ヘッダーのタイプ
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',  # 認証ヘッダーの名前
     'USER_ID_FIELD': 'id',  # ユーザーIDフィールド

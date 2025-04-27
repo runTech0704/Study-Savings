@@ -25,72 +25,51 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 認証状態チェック
+  // 認証状態チェック - JWT認証のみを使用
   useEffect(() => {
     const checkAuth = async () => {
       try {
         setLoading(true);
         
-        console.log('認証状態チェック開始');
-        
-        // JWTトークンがあるかまず確認
+        // JWTトークンがあるかチェック
         const accessToken = localStorage.getItem('access_token');
         if (accessToken) {
           try {
-            console.log('JWT認証をチェックします');
+            // トークンの検証
             await API.auth.verifyToken();
             console.log('JWTトークン有効');
             setAuthenticated(true);
           } catch (tokenError) {
             console.log('JWTトークンの検証に失敗しました。リフレッシュを試みます');
             try {
+              // トークンのリフレッシュを試行
               await API.auth.refreshToken();
               console.log('トークンのリフレッシュに成功しました');
               setAuthenticated(true);
             } catch (refreshError) {
-              console.error('トークンのリフレッシュに失敗しました:', refreshError);
-              // 失敗した場合はトークンを削除
+              console.error('トークンのリフレッシュに失敗しました');
+              // 失敗した場合はトークンを削除して未認証状態に
               localStorage.removeItem('access_token');
               localStorage.removeItem('refresh_token');
               setAuthenticated(false);
-              // ログインページ以外にいる場合はリダイレクト
+              // ログイン画面以外にいる場合はリダイレクト
               if (!location.pathname.startsWith('/login') && !location.pathname.startsWith('/register')) {
                 navigate('/login');
               }
             }
           }
         } else {
-          // JWTがない場合は従来のセッション認証をチェック
-          try {
-            console.log('セッション認証をチェックします');
-            // CSRFトークンを取得
-            await API.auth.getCSRFToken();
-            
-            // 認証状態をチェック
-            const response = await API.auth.checkAuth();
-            console.log('認証状態チェック結果:', response.data);
-            
-            if (response.data.isAuthenticated) {
-              setAuthenticated(true);
-            } else {
-              setAuthenticated(false);
-              // ログインページ以外にいる場合はリダイレクト
-              if (!location.pathname.startsWith('/login') && !location.pathname.startsWith('/register')) {
-                navigate('/login');
-              }
-            }
-          } catch (error) {
-            console.error('セッション認証チェックエラー:', error);
-            setAuthenticated(false);
-            if (!location.pathname.startsWith('/login') && !location.pathname.startsWith('/register')) {
-              navigate('/login');
-            }
+          // トークンがない場合は未認証状態
+          setAuthenticated(false);
+          // ログイン画面以外にいる場合はリダイレクト
+          if (!location.pathname.startsWith('/login') && !location.pathname.startsWith('/register')) {
+            navigate('/login');
           }
         }
       } catch (error) {
-        console.error('認証状態確認時のエラー:', error);
+        console.error('認証状態チェックエラー:', error);
         setAuthenticated(false);
-        // ログインページ以外にいる場合はリダイレクト
+        // ログイン画面以外にいる場合はリダイレクト
         if (!location.pathname.startsWith('/login') && !location.pathname.startsWith('/register')) {
           navigate('/login');
         }
@@ -110,20 +89,24 @@ function App() {
   // ログアウト処理
   const logout = async () => {
     try {
-      // JWTログアウト
-      if (localStorage.getItem('access_token')) {
-        await API.auth.logoutJWT();
-      } else {
-        // 従来のセッションログアウト
-        await API.auth.logout();
-      }
+      // JWTログアウト処理の実行
+      await API.auth.logout();
+      
+      // 認証状態を更新
       setAuthenticated(false);
+      
+      // ログイン画面に移動
       navigate('/login');
     } catch (error) {
       console.error('ログアウトエラー:', error);
+      
+      // エラーが発生しても認証状態をリセットしてログイン画面に移動
+      setAuthenticated(false);
+      navigate('/login');
     }
   };
 
+  // ロード中の表示
   if (loading) {
     return (
       <Box 

@@ -22,6 +22,7 @@
 - Django REST Framework
 - PostgreSQL (Supabase)
 - Google Vertex AI (Gemini モデル)
+- Google Secret Manager（機密情報管理）
 
 ### フロントエンド
 
@@ -37,6 +38,7 @@
 
 - Google Cloud Run
 - Google Vertex AI
+- Google Secret Manager
 - Supabase (PostgreSQL)
 - Docker / Docker Compose
 
@@ -50,6 +52,8 @@ study_savings_app/
 │   ├── migrate.sh          # マイグレーションスクリプト
 │   ├── cloudbuild.yaml     # Cloud Build設定
 │   ├── requirements.txt    # 依存パッケージ
+│   ├── env-vars.yaml       # 非機密環境変数設定
+│   ├── .env.example        # 環境変数サンプル
 │   └── study_project/      # Djangoプロジェクト
 │       ├── manage.py
 │       ├── study_project/  # プロジェクト設定
@@ -63,6 +67,7 @@ study_savings_app/
 │   ├── Dockerfile.prod     # 本番用Dockerfile
 │   ├── cloudbuild.yaml     # Cloud Build設定
 │   ├── package.json
+│   ├── .env.example        # 環境変数サンプル
 │   ├── nginx/              # Nginx設定
 │   └── src/                # Reactソースコード
 │       ├── pages/
@@ -73,8 +78,50 @@ study_savings_app/
 │           └── api.js      # APIサービス
 ├── docker-compose.yml      # 開発環境設定
 ├── setup-gcp.sh            # GCP初期設定スクリプト
-├── deploy.sh               # デプロイスクリプト
+├── deploy.sh               # Secret Managerを使用したデプロイスクリプト
+├── create-secrets.sh       # Secret Manager用シークレット作成スクリプト
+├── make_scripts_executable.sh  # スクリプト権限付与
 └── README.md
+```
+
+## シークレット管理
+
+本アプリケーションはGoogle Secret Managerを使用して機密情報を管理しています。
+非機密情報は`env-vars.yaml`ファイルで管理し、機密情報のみSecret Managerに保存します。
+
+### 必要なシークレット
+
+以下のシークレットをSecret Managerに登録する必要があります：
+
+1. `secret-key` - Django SECRET_KEY
+2. `database-url` - データベース接続文字列
+3. `jwt-secret-key` - JWT認証用の秘密鍵
+
+### シークレットの作成方法
+
+`create-secrets.sh` スクリプトを使用して機密情報のシークレットを作成できます：
+
+```bash
+# スクリプトに実行権限を付与
+chmod +x create-secrets.sh
+
+# シークレット作成の実行
+./create-secrets.sh プロジェクトID
+```
+
+### デプロイ時のシークレット使用
+
+`deploy.sh` スクリプトはデプロイ時に：
+- 非機密情報は`env-vars.yaml`から設定
+- 機密情報はSecret Managerから取得
+
+```bash
+# スクリプトに実行権限を付与
+chmod +x make_scripts_executable.sh
+./make_scripts_executable.sh
+
+# デプロイの実行
+./deploy.sh プロジェクトID リージョン
 ```
 
 ## ライセンス

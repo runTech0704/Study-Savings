@@ -84,11 +84,18 @@ try:
     # 外部キー制約を無視する
     cursor.execute("SET CONSTRAINTS ALL DEFERRED;")
     
-    # 全テーブルをドロップ
+    # 全テーブルを安全に削除（パラメータ化クエリを使用）
     if tables:
-        table_names = ', '.join(f'"{table[0]}"' for table in tables)
-        cursor.execute(f"DROP TABLE IF EXISTS {table_names} CASCADE;")
-        print("\nデータベーステーブルを削除しました。")
+        # 各テーブルを個別に削除
+        for table in tables:
+            # テーブル名を%sで置き換えるのではなく、psycopg2.sql.Identifierを使用
+            from psycopg2 import sql
+            drop_query = sql.SQL("DROP TABLE IF EXISTS {} CASCADE").format(
+                sql.Identifier(table[0])
+            )
+            cursor.execute(drop_query)
+            
+        print("\nデータベーステーブルを安全に削除しました。")
     else:
         print("\n削除するテーブルがありません。")
     

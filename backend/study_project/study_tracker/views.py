@@ -1,12 +1,10 @@
 from django.utils import timezone
-from django.contrib.auth import login, logout
 from django.db.models import Sum, F, ExpressionWrapper, fields
 from datetime import timedelta
-from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 
 from rest_framework import viewsets, status, permissions, generics
-from rest_framework.decorators import action, permission_classes, authentication_classes, api_view
+from rest_framework.decorators import action, api_view
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -27,16 +25,15 @@ from .serializers import (
 from .ai_services import analyze_learning
 
 
-# すべての認証関連ビューでCSRFを免除
-@method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(generics.CreateAPIView):
+    """ユーザー登録ビュー"""
     permission_classes = [permissions.AllowAny]
     serializer_class = RegisterSerializer
     
     def create(self, request, *args, **kwargs):
         import logging
         logger = logging.getLogger('study_tracker')
-        logger.info(f"Registration attempt with data: {request.data}")
+        logger.info(f"Registration attempt from user")
         
         try:
             return super().create(request, *args, **kwargs)
@@ -47,9 +44,8 @@ class RegisterView(generics.CreateAPIView):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# JWTログインビュー
-@method_decorator(csrf_exempt, name='dispatch')
-class LoginJWTView(APIView):
+class LoginView(APIView):
+    """JWT認証のログインビュー"""
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
@@ -60,8 +56,8 @@ class LoginJWTView(APIView):
         username = request.data.get('username')
         password = request.data.get('password')
         
-        # デバッグ情報追加
-        logger.info(f"JWT login attempt for user: {username}")
+        # ログイン試行をログ記録
+        logger.info(f"Login attempt for user: {username}")
         
         user = authenticate(username=username, password=password)
         
@@ -70,60 +66,14 @@ class LoginJWTView(APIView):
             refresh = RefreshToken.for_user(user)
             
             # ログイン成功時の情報記録
-            logger.info(f"JWT login successful for user: {username}")
+            logger.info(f"Login successful for user: {username}")
             
             return Response({
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
                 'user': UserSerializer(user).data,
-                'message': 'JWTログインに成功しました。'
+                'message': 'ログインに成功しました。'
             })
-        
-        # ログイン失敗時の情報記録
-        logger.error(f"JWT login failed for user: {username}")
-        return Response({
-            'message': 'ユーザー名またはパスワードが無効です。'
-        }, status=status.HTTP_400_BAD_REQUEST)
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class LoginView(APIView):
-    permission_classes = [permissions.AllowAny]
-    
-    def post(self, request):
-        import logging
-        logger = logging.getLogger('study_tracker')
-        
-        from django.contrib.auth import authenticate
-        username = request.data.get('username')
-        password = request.data.get('password')
-        
-        # デバッグ情報追加
-        logger.info(f"Login attempt for user: {username}")
-        logger.info(f"Request headers: {dict(request.headers)}")
-        logger.info(f"CSRF token in headers: {request.headers.get('X-CSRFToken', 'None')}")
-        logger.info(f"Request cookies: {request.COOKIES}")
-        
-        user = authenticate(username=username, password=password)
-        
-        if user:
-            login(request, user)
-            # ログイン成功時の情報記録
-            logger.info(f"Login successful for user: {username}")
-            logger.info(f"Session key: {request.session.session_key}")
-            logger.info(f"Session cookie age: {request.session.get_expiry_age()}")
-            
-            # レスポンスにセッション情報を含める
-            response = Response({
-                'user': UserSerializer(user).data,
-                'message': 'ログインに成功しました。',
-                'session_info': {
-                    'session_key': request.session.session_key,
-                    'expiry_age': request.session.get_expiry_age(),
-                    'csrf_token': request.META.get('CSRF_COOKIE', '')
-                }
-            })
-            return response
         
         # ログイン失敗時の情報記録
         logger.error(f"Login failed for user: {username}")
@@ -132,36 +82,31 @@ class LoginView(APIView):
         }, status=status.HTTP_400_BAD_REQUEST)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class LogoutView(APIView):
+    """ログアウトビュー - JWTの場合は単に成功メッセージを返す"""
+    permission_classes = [IsAuthenticated]
+    
     def post(self, request):
         import logging
         logger = logging.getLogger('study_tracker')
         
-        # デバッグ情報追加
+        # ログアウト試行をログ記録
         if request.user.is_authenticated:
             logger.info(f"Logout attempt for user: {request.user.username}")
-            session_key = request.session.session_key
-            logger.info(f"Session before logout: {session_key}")
-        else:
-            logger.info("Logout attempt for unauthenticated user")
-            
-        # ログアウト処理
-        logout(request)
+        
+        # JWTの場合は特にサーバー側での処理は不要（クライアント側でトークンを削除）
         logger.info("User logged out successfully")
         
         return Response({'message': 'ログアウトしました。'})
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class UserView(APIView):
-    permission_classes = [AllowAny]  # 開発中はAllowAnyに設定
+    """現在のユーザー情報を取得・更新するビュー"""
+    permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        if request.user.is_authenticated:
-            serializer = UserSerializer(request.user)
-            return Response(serializer.data)
-        return Response({"detail": "認証されていません"}, status=status.HTTP_401_UNAUTHORIZED)
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
         
     def put(self, request):
         serializer = UserSerializer(request.user, data=request.data, partial=True)
@@ -171,30 +116,24 @@ class UserView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# すべてのViewSetとViewでCSRF免除を適用
-@method_decorator(csrf_exempt, name='dispatch')
 class SubjectViewSet(viewsets.ModelViewSet):
+    """勉強科目のCRUD操作を行うViewSet"""
     serializer_class = SubjectSerializer
-    permission_classes = [AllowAny]  # 開発中はAllowAnyに設定
+    permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        if not self.request.user.is_authenticated:
-            return Subject.objects.none()
         return Subject.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
 
-# セッションリクエストに関連する全てのViewSet
-@method_decorator(csrf_exempt, name='dispatch')
 class StudySessionViewSet(viewsets.ModelViewSet):
+    """勉強セッションのCRUD操作を行うViewSet"""
     serializer_class = StudySessionSerializer
-    permission_classes = [AllowAny]  # 開発中はAllowAnyに設定
+    permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        if not self.request.user.is_authenticated:
-            return StudySession.objects.none()
         return StudySession.objects.filter(user=self.request.user)
         
     def update(self, request, *args, **kwargs):
@@ -257,8 +196,6 @@ class StudySessionViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def current(self, request):
-        if not request.user.is_authenticated:
-            return Response({'active': False})
         session = StudySession.objects.filter(user=request.user, end_time=None).first()
         if not session:
             return Response({'active': False})
@@ -268,34 +205,23 @@ class StudySessionViewSet(viewsets.ModelViewSet):
         })
 
 
-# 貯金目標関連の全てのViewSet
-@method_decorator(csrf_exempt, name='dispatch')
 class SavingsGoalViewSet(viewsets.ModelViewSet):
+    """貯金目標のCRUD操作を行うViewSet"""
     serializer_class = SavingsGoalSerializer
-    permission_classes = [AllowAny]  # 開発中はAllowAnyに設定
+    permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        if not self.request.user.is_authenticated:
-            return SavingsGoal.objects.none()
         return SavingsGoal.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class StatsView(APIView):
-    permission_classes = [AllowAny]  # 開発中はAllowAnyに設定
+    """統計情報を取得するビュー"""
+    permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        if not request.user.is_authenticated:
-            return Response({
-                'total_hours_week': 0,
-                'total_hours_month': 0,
-                'total_savings': 0,
-                'subject_stats': []
-            })
-            
         # 今週の勉強時間
         now = timezone.now()
         week_start = now - timedelta(days=now.weekday())
@@ -357,8 +283,6 @@ class StatsView(APIView):
         })
 
 
-# 学習分析用の新しいビュー
-@method_decorator(csrf_exempt, name='dispatch')
 @api_view(['POST'])
 def analyze_learning_view(request):
     """学習状況を分析するAIエンドポイント"""

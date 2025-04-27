@@ -61,22 +61,20 @@ function Login() {
       setError('');
       
       try {
-        console.log('JWTログインを開始します...');
-        const response = await API.auth.loginJWT(values);
-        console.log('JWTログイン成功:', response);
+        // ログイン処理の実行
+        const response = await API.auth.login(values);
         
-        // 認証状態を確認
-        const authCheckResponse = await API.auth.checkAuth();
-        console.log('JWT認証チェック結果:', authCheckResponse);
-        
-        if (authCheckResponse.data.isAuthenticated) {
-          login(); // 認証状態を更新
+        if (response.data.access && response.data.refresh) {
+          console.log('ログイン成功');
+          
+          // 認証状態の更新
+          login();
         } else {
-          console.error('JWTログインは成功したが、認証状態の確認に失敗しました');
+          console.error('ログインレスポンスにトークンが含まれていません');
           setError('ログイン処理に問題が発生しました。再度お試しください。');
         }
       } catch (error) {
-        console.error('JWTログインエラー:', error);
+        console.error('ログインエラー:', error);
         setError(error.response?.data?.message || 'ログインに失敗しました。もう一度お試しください。');
       } finally {
         setLoading(false);
