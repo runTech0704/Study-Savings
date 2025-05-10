@@ -46,6 +46,13 @@ INSTALLED_APPS = [
     'corsheaders',
     'study_tracker',
     'whitenoise.runserver_nostatic',  # 静的ファイル配信
+
+    # OAuth 認証
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google' #googleの認証
 ]
 
 MIDDLEWARE = [
@@ -54,8 +61,9 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',  # 静的ファイル配信用ミドルウェア
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware', 
+    'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'study_tracker.middleware.RateLimitMiddleware',  # レート制限ミドルウェア
@@ -272,3 +280,49 @@ if not DEBUG:
 # Vertex AI設定
 GCP_PROJECT_ID = os.environ.get('GCP_PROJECT_ID', '')
 GCP_REGION = os.environ.get('GCP_REGION', 'us-central1')
+
+# 認証周り
+#ログイン処理時に認証で行うクラスにallauthを追加する
+AUTHENTICATION_BACKENDS=(
+    'django.contrib.auth.backends.ModelBackend',#デフォルトの認証
+    'allauth.account.auth_backends.AuthenticationBackend' #allauthの認証
+)
+
+SITE_ID=2
+# django-allauth設定
+ACCOUNT_AUTHENTICATION_METHOD='email'
+ACCOUNT_EMAIL_REQUIRED=True
+ACCOUNT_UNIQUE_EMAIL=True
+ACCOUNT_USERNAME_REQUIRED=False
+ACCOUNT_EMAIL_VERIFICATION='mandatory'
+ACCOUNT_DEFAULT_HTTP_PROTOCOL='https' if not DEBUG else 'http'
+SOCIALACCOUNT_PROVIDERS={
+    'google':{
+        'SCOPE':[ #Google APIで何を取得するか
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS':{
+            'access_type':'online',
+    }}}
+
+
+# ログイン後のリダイレクト先
+LOGIN_REDIRECT_URL = '/api/user/'
+# ログアウト後のリダイレクト先
+LOGOUT_REDIRECT_URL = '/'
+# allauthが使用するリダイレクトURL
+ACCOUNT_LOGOUT_REDIRECT_URL = '/'
+
+# カスタムアダプタの設定
+ACCOUNT_ADAPTER = 'study_tracker.adapters.CustomAccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'study_tracker.adapters.CustomSocialAccountAdapter'
+
+# Django Allauthの設定
+SOCIALACCOUNT_LOGIN_ON_GET = True  # GETリクエストでもソーシャルログインを許可
+SOCIALACCOUNT_AUTO_SIGNUP = True  # 自動サインアップを有効化# ログイン後のリダイレクト先
+LOGIN_REDIRECT_URL = '/api/auth/oauth-callback/'
+# ログアウト後のリダイレクト先
+LOGOUT_REDIRECT_URL = 'https://study-savings-frontend-456434511485.asia-northeast1.run.app/'
+# allauthが使用するリダイレクトURL
+ACCOUNT_LOGOUT_REDIRECT_URL = 'https://study-savings-frontend-456434511485.asia-northeast1.run.app/'
