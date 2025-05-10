@@ -3,8 +3,8 @@
 
 # Django設定
 DEBUG: "False"
-ALLOWED_HOSTS: "study-savings-backend-jwe74s2n4a-an.a.run.app,localhost,127.0.0.1"
-CORS_ALLOWED_ORIGINS: "https://study-savings-frontend-456434511485.asia-northeast1.run.app,http://localhost:3000,https://study-savings-backend-jwe74s2n4a-an.a.run.app"
-CSRF_TRUSTED_ORIGINS: "https://study-savings-frontend-456434511485.asia-northeast1.run.app,https://study-savings-backend-jwe74s2n4a-an.a.run.app,http://localhost:3000"
+ALLOWED_HOSTS: "study-savings-backend-jwe74s2n4a-an.a.run.app,localhost,127.0.0.1,study-savings-backend-456434511485.asia-northeast1.run.app"
+CORS_ALLOWED_ORIGINS: "https://study-savings-frontend-456434511485.asia-northeast1.run.app,https://study-savings-backend-456434511485.asia-northeast1.run.app,http://localhost:3000,"
+CSRF_TRUSTED_ORIGINS: "https://study-savings-frontend-456434511485.asia-northeast1.run.app,https://study-savings-backend-456434511485.asia-northeast1.run.app,https://study-savings-backend-jwe74s2n4a-an.a.run.app,http://localhost:3000"
 GCP_PROJECT_ID: "study-savings"
 GCP_REGION: "us-central1"

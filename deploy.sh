@@ -206,6 +206,9 @@ python manage.py migrate study_tracker
 # 他のマイグレーションがあれば実行
 python manage.py migrate
 
+# Admin ユーザーを作成
+python create_superuser.py
+
 # Djangoアプリケーションを起動
 echo "Starting application..."
 gunicorn --bind 0.0.0.0:$PORT study_project.wsgi:application

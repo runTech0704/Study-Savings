@@ -10,11 +10,12 @@ import {
   Link, 
   Divider, 
   Alert,
-  CircularProgress 
+  CircularProgress,
+  Snackbar 
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, startGoogleOAuth } from '../contexts/AuthContext';
 import API from '../services/api';
 
 // バリデーションスキーマ
@@ -31,24 +32,63 @@ function Login() {
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
   
   // ページロード時の処理
   useEffect(() => {
     const checkAuthOnLoad = async () => {
-      try {
-        // 既存のJWTトークンで既に認証済みか確認
-        const authResult = await API.auth.checkAuth();
-        if (authResult.data.isAuthenticated) {
-          console.log('既に認証済みです。ダッシュボードにリダイレクトします。');
-          login(); // 既に認証されているなら状態を更新
+      // JWTトークンが存在するかチェック
+      const accessToken = localStorage.getItem('access_token');
+      if (accessToken) {
+        try {
+          // トークンの検証を試行
+          await API.auth.verifyToken();
+          console.log('JWTトークンが有効です。ダッシュボードにリダイレクトします。');
+          login();
+        } catch (tokenError) {
+          console.warn('トークンが無効です。リフレッシュを試みます', tokenError);
+          try {
+            // トークンのリフレッシュを試行
+            await API.auth.refreshToken();
+            console.log('トークンのリフレッシュに成功しました');
+            login();
+          } catch (refreshError) {
+            console.error('トークンのリフレッシュに失敗しました', refreshError);
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+          }
         }
-      } catch (error) {
-        console.error('認証状態確認エラー:', error);
+      } else {
+        // トークンがない場合は未認証状態
+        console.log('JWTトークンがありません');
       }
     };
     
     checkAuthOnLoad();
   }, [login]);
+  
+  // Google OAuth認証を開始する関数
+  const handleGoogleLogin = () => {
+    try {
+      // Google OAuth認証を開始
+      const result = startGoogleOAuth();
+      
+      if (!result) {
+        setSnackbarMessage('Google認証の開始に失敗しました。ポップアップがブロックされていないか確認してください。');
+        setSnackbarOpen(true);
+      }
+    } catch (error) {
+      console.error('Google認証エラー:', error);
+      setSnackbarMessage('Google認証中にエラーが発生しました。後でもう一度お試しください。');
+      setSnackbarOpen(true);
+    }
+  };
+  
+  // Snackbarを閉じる関数
+  const handleSnackbarClose = () => {
+    setSnackbarOpen(false);
+  };
   
   const formik = useFormik({
     initialValues: {
@@ -67,6 +107,11 @@ function Login() {
         if (response.data.access && response.data.refresh) {
           console.log('ログイン成功');
           
+          // JWTトークンをローカルストレージに保存
+          localStorage.setItem('access_token', response.data.access);
+          localStorage.setItem('refresh_token', response.data.refresh);
+          console.log('トークンが保存されました:', localStorage.getItem('access_token'));
+          
           // 認証状態の更新
           login();
         } else {
@@ -75,7 +120,14 @@ function Login() {
         }
       } catch (error) {
         console.error('ログインエラー:', error);
-        setError(error.response?.data?.message || 'ログインに失敗しました。もう一度お試しください。');
+        
+        // レート制限エラー（429）の場合は特別なメッセージを表示
+        if (error.response && error.response.status === 429) {
+          const retryAfter = error.response.data.retry_after || 60;
+          setError(`リクエストが多すぎます。${retryAfter}秒後に再度お試しください。`);
+        } else {
+          setError(error.response?.data?.message || 'ログインに失敗しました。もう一度お試しください。');
+        }
       } finally {
         setLoading(false);
       }
@@ -157,6 +209,45 @@ function Login() {
           </form>
           
           <Divider sx={{ my: 3 }} />
+          
+          {/* Googleログインボタン */}
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            sx={{
+              mt: 1,
+              mb: 2,
+              py: 1.5,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid #e0e0e0',
+              color: 'rgba(0, 0, 0, 0.87)',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+              },
+            }}
+          >
+            {loading ? <CircularProgress size={20} sx={{ mr: 1 }} /> : (
+              <img
+                src="/logo192.png"
+                alt="App Logo"
+                style={{ width: '24px', height: '24px', marginRight: '8px' }}
+              />
+            )}
+            Googleでログイン
+          </Button>
+          
+          {/* エラー通知用Snackbar */}
+          <Snackbar
+            open={snackbarOpen}
+            autoHideDuration={6000}
+            onClose={handleSnackbarClose}
+            message={snackbarMessage}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          />
           
           <Box sx={{ textAlign: 'center' }}>
             <Typography variant="body2" color="text.secondary">

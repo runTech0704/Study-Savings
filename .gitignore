@@ -95,3 +95,4 @@ htmlcov/
 
 # backend
 ./backend/study_project/db
+auth-credential.json

@@ -11,3 +11,4 @@ gunicorn==21.2.0  # 本番環境用サーバー
 whitenoise==6.6.0  # 静的ファイル配信
 google-cloud-aiplatform==1.71.0  # Vertex AI SDK
 vertexai==1.71.0  # Vertex AI Python SDK
+django-allauth==64.0.0
