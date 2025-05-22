@@ -29,7 +29,7 @@ def initialize_vertex_ai():
         raise
 
 # Geminiモデルのインスタンス取得
-def get_gemini_model(model_name="gemini-1.5-pro"):
+def get_gemini_model(model_name="gemini-2.0-flash"):
     try:
         initialize_vertex_ai()
         model = GenerativeModel(model_name)
@@ -39,7 +39,7 @@ def get_gemini_model(model_name="gemini-1.5-pro"):
         raise
 
 # 汎用的なプロンプト送信関数
-def generate_response(prompt, model_name="gemini-1.5-pro", temperature=0.2):
+def generate_response(prompt, model_name="gemini-2.0-flash", temperature=0.2):
     try:
         model = get_gemini_model(model_name)
         response = model.generate_content(prompt)
