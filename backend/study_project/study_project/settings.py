@@ -31,7 +31,7 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [host.strip() for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host.strip()]
 
 # Application definition
 INSTALLED_APPS = [
@@ -140,10 +140,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS settings - 本番環境でのクロスドメインに対応
 CORS_ALLOW_ALL_ORIGINS = False  # すべてのオリジンを許可しない
-CORS_ALLOWED_ORIGINS = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://study-savings-frontend-456434511485.asia-northeast1.run.app').split(',')
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://study-savings-frontend-456434511485.asia-northeast1.run.app').split(',') if origin.strip()]
 
 # CSRF設定
-CSRF_TRUSTED_ORIGINS = os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://study-savings-frontend-456434511485.asia-northeast1.run.app').split(',')
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://study-savings-frontend-456434511485.asia-northeast1.run.app').split(',') if origin.strip()]
 
 # Cookie認証のための設定
 CORS_ALLOW_CREDENTIALS = True
@@ -288,7 +288,7 @@ AUTHENTICATION_BACKENDS=(
     'allauth.account.auth_backends.AuthenticationBackend' #allauthの認証
 )
 
-SITE_ID=2
+SITE_ID=3
 # django-allauth設定
 ACCOUNT_AUTHENTICATION_METHOD='email'
 ACCOUNT_EMAIL_REQUIRED=True
